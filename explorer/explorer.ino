@@ -25,6 +25,7 @@ const int travel = 3;
 
 // operation constants
 const int waitTime = 300;
+const int maxWalk = 25;
 
 // global variables
 float xCoord;
@@ -36,8 +37,12 @@ int missionState;
 int nextMissionState;
 int nextOpState;
 
+int deltaCandidate;
+int clearanceCandidate;
+
 void setup() 
 {
+  randomSeed(sparki.magY());
   missionState = atHome;
   sparki.servo(0);       //center the range finder
   delay(waitTime * 3);  
@@ -95,16 +100,36 @@ void loop()
           switch(opState)
           {
             case pickDirection:
+              nextMissionState = exploring;
+              nextOpState = testDirection;
+              deltaCandidate = randomHeadingDelta();
               break;
             case testDirection:
+              nextMissionState = exploring;
+              nextOpState = rotate;
+              clearanceCandidate = distanceAtDelta(deltaCandidate);
               break;
             case rotate:
+              nextMissionState = exploring;
+              if (clearanceCandidate > 10)
+              {
+                nextOpState = travel;
+                turnToDelta(deltaCandidate);
+              }
+              else
+              {
+                nextOpState = pickDirection;
+              }
               break;
             case travel:
+              nextMissionState = exploring;
+              nextOpState = pickDirection;
+              goForth(clearanceCandidate);
               break;
           }
           break;
         case returnTest:
+          sparki.RGB(RGB_RED);
           switch(opState)
           {
             case pickDirection:
@@ -114,8 +139,10 @@ void loop()
           }
           break;
         case returnClear:
+          sparki.RGB(RGB_RED);
           break;
         case returnObstructed:
+          sparki.RGB(RGB_RED);
           switch(opState)
           {
             case pickDirection:
@@ -132,3 +159,52 @@ void loop()
       break;
   }
 }
+
+int randomHeadingDelta()
+{
+  return random(-90, 91);  
+}
+
+float distanceAtDelta(int delta)
+{
+  bool deltaPossible = (delta >= -90 && delta <= 90);
+  float range = -1;
+  switch(deltaPossible)
+  {
+    case true:
+      sparki.servo(-1*delta);
+      delay(waitTime * 3);
+      while(range = -1)
+      {
+        range = sparki.ping();
+      }
+      break;
+    case false:
+      break; 
+  }
+  return range;
+}
+
+void turnToDelta(int headingDelta)
+{
+  heading = heading + headingDelta;
+  bool turnRight = headingDelta < 0;
+  switch (turnRight)
+      {
+        case true:
+            sparki.moveRight(-1*headingDelta);
+            break;
+        case false:
+            sparki.moveLeft(headingDelta);
+            break;
+      }
+}
+
+void goForth(int clearance)
+{
+  int distance = random(max(clearance, maxWalk));
+  xCoord = xCoord + distance*cos(heading*PI/180);
+  yCoord = yCoord + distance*sin(heading*PI/180);
+  sparki.moveForward(distance);
+}
+
