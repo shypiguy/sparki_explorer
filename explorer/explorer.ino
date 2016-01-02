@@ -133,25 +133,59 @@ void loop()
           switch(opState)
           {
             case pickDirection:
+              nextMissionState = returnTest;
+              nextOpState = testDirection;
+              pointHome();
               break;
             case testDirection:
+              clearanceCandidate = distanceAtDelta(0);
+              if (clearanceCandidate > distanceToHome())
+              {
+                nextMissionState = returnClear;
+              }
+              else
+              {
+                nextMissionState = returnObstructed;
+                nextOpState = pickDirection;
+              }
               break;
           }
           break;
         case returnClear:
           sparki.RGB(RGB_RED);
+          nextMissionState = atHome;
+          sparki.moveForward(distanceToHome());
           break;
         case returnObstructed:
           sparki.RGB(RGB_RED);
           switch(opState)
           {
             case pickDirection:
+              nextMissionState = returnObstructed;
+              nextOpState = testDirection;
+              deltaCandidate = randomHeadingDelta();
               break;
             case testDirection:
+              nextMissionState = returnObstructed;
+              nextOpState = rotate;
+              clearanceCandidate = distanceAtDelta(deltaCandidate);
               break;
             case rotate:
+              nextMissionState = returnObstructed;
+              if (clearanceCandidate > 10)
+              {
+                nextOpState = travel;
+                turnToDelta(deltaCandidate);
+              }
+              else
+              {
+                nextOpState = pickDirection;
+              }
               break;
             case travel:
+              nextMissionState = returnTest;
+              nextOpState = pickDirection;
+              goForth(clearanceCandidate);
               break;
           }
           break;
@@ -206,5 +240,20 @@ void goForth(int clearance)
   xCoord = xCoord + distance*cos(heading*PI/180);
   yCoord = yCoord + distance*sin(heading*PI/180);
   sparki.moveForward(distance);
+}
+
+void pointHome()
+{
+  float headingOut = atan(yCoord/xCoord)*180/PI;
+  if (xCoord < 0) {headingOut = headingOut + 180;}
+  float headingBack = fmod(headingOut + 180, 360);
+  float deltaHeading = headingBack - heading;
+  heading = headingBack;
+  sparki.moveLeft(deltaHeading);
+}
+
+float distanceToHome()
+{
+  return sqrt((xCoord*xCoord) + (yCoord*yCoord));
 }
 
