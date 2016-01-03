@@ -297,7 +297,9 @@ void goForth(int clearance)
   int distance = random(min(clearance -10, maxWalk));
   xCoord = xCoord + distance*cos(heading*PI/180);
   yCoord = yCoord + distance*sin(heading*PI/180);
-  sparki.moveForward(distance);
+  //sparki.moveForward(distance);
+  unsigned long steps = distance * STEPS_PER_CM;
+  sparki.stepForward(steps);
 }
 
 void pointHome()
