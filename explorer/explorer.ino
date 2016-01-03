@@ -226,21 +226,23 @@ float distanceAtDelta(int delta)
   int j;
   int max_observation;
   int min_observation;
-  int obSum;
+  int obSum[3];
   int obCount;
   switch(deltaPossible)
   {
     case true:
       sparki.servo(-1*delta);
       delay(waitTime);
+      obSum[0] = 0;
       for (i = 0; i < 5; i++)
       {
         observation[i] = sparki.ping();
       }
       for (i = 0; i < 5; i++)
       {
-        obSum = obSum +observation[i];
-      }   
+        obSum[0] = obSum[0] + observation[i];
+      }
+      obSum[1] = 0;   
       sparki.servo(-1*delta + 10);
       delay(waitTime);
       for (i = 0; i < 5; i++)
@@ -249,8 +251,9 @@ float distanceAtDelta(int delta)
       }
       for (i = 0; i < 5; i++)
       {
-        obSum = obSum +observation[i];
+        obSum[1] = obSum[1] + observation[i];
       }
+      obSum[2] = 0;
       sparki.servo(-1*delta - 10);
       delay(waitTime);
       for (i = 0; i < 5; i++)
@@ -259,9 +262,14 @@ float distanceAtDelta(int delta)
       }
       for (i = 0; i < 5; i++)
       {
-        obSum = obSum +observation[i];
-      }               
-      return obSum/15;
+        obSum[2] = obSum[2] + observation[i];
+      } 
+      min_observation = obSum[0];
+      for (i = 1; i < 3; i++)
+      {
+        if (obSum[i] < min_observation){min_observation = obSum[i];}      
+      }
+      return min_observation/5;
       break;
     case false:
       break; 
@@ -271,7 +279,7 @@ float distanceAtDelta(int delta)
 
 void turnToDelta(int headingDelta)
 {
-  heading = heading + headingDelta;
+  heading = (heading + headingDelta) % 360;
   bool turnRight = headingDelta < 0;
   switch (turnRight)
       {
