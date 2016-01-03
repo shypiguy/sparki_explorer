@@ -24,8 +24,8 @@ const int rotate = 2;
 const int travel = 3;
 
 // operation constants
-const int waitTime = 300;
-const int maxWalk = 25;
+const int waitTime = 700;
+const int maxWalk = 40;
 
 // global variables
 float xCoord;
@@ -45,11 +45,23 @@ void setup()
   randomSeed(sparki.magY());
   missionState = atHome;
   sparki.servo(0);       //center the range finder
-  delay(waitTime * 3);  
+  delay(waitTime);  
 }
 
 void loop() 
 {
+
+    sparki.clearLCD(); // wipe the screen
+    sparki.print("missionState: "); // show heading on screen
+    sparki.println(missionState);
+    sparki.print("opState: "); // show heading on screen
+    sparki.println(opState);
+    sparki.print("deltaCandidate: "); // show heading on screen
+    sparki.println(deltaCandidate);
+    sparki.print("clearanceCandidate: "); // show heading on screen
+    sparki.println(clearanceCandidate);
+    
+    sparki.updateLCD(); // display all of the information written to the screen    
   
   // Scan for IR receiver
   int command = sparki.readIR();
@@ -139,7 +151,7 @@ void loop()
               break;
             case testDirection:
               clearanceCandidate = distanceAtDelta(0);
-              if (clearanceCandidate > distanceToHome())
+              if (clearanceCandidate > min(distanceToHome(), maxWalk))
               {
                 nextMissionState = returnClear;
               }
@@ -153,8 +165,14 @@ void loop()
           break;
         case returnClear:
           sparki.RGB(RGB_RED);
-          nextMissionState = atHome;
-          sparki.moveForward(distanceToHome());
+          clearanceCandidate = min(distanceToHome(), maxWalk);
+          if (clearanceCandidate < maxWalk)
+          {nextMissionState = atHome;}
+          else
+          {nextMissionState = returnTest; nextOpState = testDirection;}
+          xCoord = xCoord + clearanceCandidate*cos(heading*PI/180);
+          yCoord = yCoord + clearanceCandidate*sin(heading*PI/180);
+          sparki.moveForward(clearanceCandidate);
           break;
         case returnObstructed:
           sparki.RGB(RGB_RED);
@@ -196,22 +214,54 @@ void loop()
 
 int randomHeadingDelta()
 {
-  return random(-90, 91);  
+  return random(-70, 71);  
 }
 
 float distanceAtDelta(int delta)
 {
-  bool deltaPossible = (delta >= -90 && delta <= 90);
+  bool deltaPossible = (delta >= -70 && delta <= 70);
   float range = -1;
+  int observation[5];
+  int i;
+  int j;
+  int max_observation;
+  int min_observation;
+  int obSum;
+  int obCount;
   switch(deltaPossible)
   {
     case true:
       sparki.servo(-1*delta);
-      delay(waitTime * 3);
-      while(range = -1)
+      delay(waitTime);
+      for (i = 0; i < 5; i++)
       {
-        range = sparki.ping();
+        observation[i] = sparki.ping();
       }
+      for (i = 0; i < 5; i++)
+      {
+        obSum = obSum +observation[i];
+      }   
+      sparki.servo(-1*delta + 10);
+      delay(waitTime);
+      for (i = 0; i < 5; i++)
+      {
+        observation[i] = sparki.ping();
+      }
+      for (i = 0; i < 5; i++)
+      {
+        obSum = obSum +observation[i];
+      }
+      sparki.servo(-1*delta - 10);
+      delay(waitTime);
+      for (i = 0; i < 5; i++)
+      {
+        observation[i] = sparki.ping();
+      }
+      for (i = 0; i < 5; i++)
+      {
+        obSum = obSum +observation[i];
+      }               
+      return obSum/15;
       break;
     case false:
       break; 
@@ -236,7 +286,7 @@ void turnToDelta(int headingDelta)
 
 void goForth(int clearance)
 {
-  int distance = random(max(clearance, maxWalk));
+  int distance = random(min(clearance -10, maxWalk));
   xCoord = xCoord + distance*cos(heading*PI/180);
   yCoord = yCoord + distance*sin(heading*PI/180);
   sparki.moveForward(distance);
