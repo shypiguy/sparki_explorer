@@ -23,22 +23,35 @@ const int testDirection = 1;
 const int rotate = 2;
 const int travel = 3;
 
+// moveMode constants
+const int goForward = 0;
+const int rotateLeft = 1;
+const int rotateRight = 2;
+
 // operation constants
 const int waitTime = 700;
 const int maxWalk = 40;
 
 // global variables
-float xCoord;
-float yCoord;
-int heading;
+float xCoord; //measure in cm of robot distance from origin on X axis
+float yCoord; //measure in cm of robot distance from origin on Y axis
+int heading;  //measure in degrees of robot heading relative to starting position
 
-int opState;
-int missionState;
-int nextMissionState;
-int nextOpState;
+int opState;          //indicator of the current operation state (mission step) - see opState constants above for possible values
+int missionState;     //indicator of the current mission state - see missionState constants above for possible values
+int nextMissionState; //mission state to be applied at next pass through the decision switches
+int nextOpState;      //operation state (mission step) to be applied at the start of the next pass throught he decision switches
 
-int deltaCandidate;
-int clearanceCandidate;
+int deltaCandidate;     // offset in degrees from the current heading to be considered in the next pass through the descision switches
+int clearanceCandidate; // distance in cm measured a the last pass through the sensing steps
+
+int moveMode;     // indicator of the current movement command type - see moveMode constants above for possible values
+
+int maxDistance;  // maximum distance in cm from the point of origin that Sparki should be allowed to travel
+int stepsLeft;    // count of remaining steps in current move operation not yet sent as move command to the motors
+int stepsAtATime; // maximum number of steps that can be commanded to the motors in a single pass through the move steps
+
+int delayTime;    // delay time in milliseconds to be applied at the end of each loop pass resulting in a motor command
 
 void setup() 
 {
