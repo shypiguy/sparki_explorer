@@ -27,38 +27,49 @@ const int travel = 3;
 const int goForward = 0;
 const int rotateLeft = 1;
 const int rotateRight = 2;
+const int noMove = 3;
 
 // operation constants
-const int waitTime = 700;
 const int maxWalk = 40;
 
 // global variables
-float xCoord; //measure in cm of robot distance from origin on X axis
-float yCoord; //measure in cm of robot distance from origin on Y axis
-int heading;  //measure in degrees of robot heading relative to starting position
+float xCoord;           //measure in cm of robot distance from origin on X axis
+float yCoord;           //measure in cm of robot distance from origin on Y axis
+int heading;            //measure in degrees of robot heading relative to starting position
 
-int opState;          //indicator of the current operation state (mission step) - see opState constants above for possible values
-int missionState;     //indicator of the current mission state - see missionState constants above for possible values
-int nextMissionState; //mission state to be applied at next pass through the decision switches
-int nextOpState;      //operation state (mission step) to be applied at the start of the next pass throught he decision switches
+int opState;            //indicator of the current operation state (mission step) - see opState constants above for possible values
+int missionState;       //indicator of the current mission state - see missionState constants above for possible values
+int nextMissionState;   //mission state to be applied at next pass through the decision switches
+int nextOpState;        //operation state (mission step) to be applied at the start of the next pass throught he decision switches
 
 int deltaCandidate;     // offset in degrees from the current heading to be considered in the next pass through the descision switches
 int clearanceCandidate; // distance in cm measured a the last pass through the sensing steps
 
-int moveMode;     // indicator of the current movement command type - see moveMode constants above for possible values
+int moveMode;           // indicator of the current movement command type - see moveMode constants above for possible values
 
-int maxDistance;  // maximum distance in cm from the point of origin that Sparki should be allowed to travel
-int stepsLeft;    // count of remaining steps in current move operation not yet sent as move command to the motors
-int stepsAtATime; // maximum number of steps that can be commanded to the motors in a single pass through the move steps
+int maxDistance;        // maximum distance in cm from the point of origin that Sparki should be allowed to travel
+int stepsLeft;          // count of remaining steps in current move operation not yet sent as move command to the motors
+int stepsAtATime;       // maximum number of steps that can be commanded to the motors in a single pass through the move steps
 
-int delayTime;    // delay time in milliseconds to be applied at the end of each loop pass resulting in a motor command
+int delayTime;          // delay time in milliseconds to be applied at the end of each loop pass resulting in a motor command
 
 void setup() 
 {
+  //initialize the pseudo random number generator - the magnetometer gives a good random seed
   randomSeed(sparki.magY());
+  
+  // set starting operation parameters - can be changed by the user at run time
+  delayTime = 200;
+  maxDistance = 150;
+  stepsAtATime = 50;
+  
+  // set indicators that Sparki is at origin, waiting for a command
   missionState = atHome;
-  sparki.servo(0);       //center the range finder
-  delay(waitTime);  
+  moveMode = noMove;
+
+  //center the range finder
+  sparki.servo(0);       
+  delay(delayTime);  
 }
 
 void loop() 
@@ -107,7 +118,7 @@ void loop()
   switch(stillBusy)
   {
     case true:
-      delay(waitTime);
+      delay(delayTime);
       break;
     case false:
       missionState = nextMissionState;
@@ -245,7 +256,7 @@ float distanceAtDelta(int delta)
   {
     case true:
       sparki.servo(-1*delta);
-      delay(waitTime);
+      delay(delayTime);
       obSum[0] = 0;
       for (i = 0; i < 5; i++)
       {
@@ -257,7 +268,7 @@ float distanceAtDelta(int delta)
       }
       obSum[1] = 0;   
       sparki.servo(-1*delta + 10);
-      delay(waitTime);
+      delay(delayTime);
       for (i = 0; i < 5; i++)
       {
         observation[i] = sparki.ping();
@@ -268,7 +279,7 @@ float distanceAtDelta(int delta)
       }
       obSum[2] = 0;
       sparki.servo(-1*delta - 10);
-      delay(waitTime);
+      delay(delayTime);
       for (i = 0; i < 5; i++)
       {
         observation[i] = sparki.ping();
