@@ -76,15 +76,16 @@ void loop()
 {
 
     sparki.clearLCD(); // wipe the screen
-    sparki.print("missionState: "); // show heading on screen
-    sparki.println(missionState);
-    sparki.print("opState: "); // show heading on screen
-    sparki.println(opState);
-    sparki.print("deltaCandidate: "); // show heading on screen
-    sparki.println(deltaCandidate);
-    sparki.print("clearanceCandidate: "); // show heading on screen
-    sparki.println(clearanceCandidate);
-    
+    sparki.print("delayTime: "); // show delayTime setting on screen
+    sparki.println(delayTime);
+    sparki.print("maxDistance: "); // show max Distance on screen
+    sparki.println(maxDistance);
+    sparki.print("x y h: "); // show positional information on screen
+    sparki.print(xCoord);
+    sparki.print(" ");
+    sparki.print(yCoord);
+    sparki.print(" ");
+    sparki.println(heading);
     sparki.updateLCD(); // display all of the information written to the screen    
   
   // Scan for IR receiver
