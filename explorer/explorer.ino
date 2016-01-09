@@ -111,6 +111,18 @@ void loop()
       case 94:  // button "3" = stop and reset in place 
         nextMissionState = atHome;
         break;
+      case 70:  // button "up arrow" = increase delay
+        delayTime = delayTime + 10;
+        break;
+      case 21:  // button "down arrow" = decrease delay
+        if (delayTime >= 10){delayTime = delayTime - 10;}
+        break;
+      case 68:  // button "left arrow"  = decrease allowed range
+        if (maxDistance >= 40){maxDistance = maxDistance -10;}
+        break;
+      case 67:  // button "right arrow" = increase allowed range
+        maxDistance = maxDistance + 10;
+        break; 
     }
   }
 
