@@ -85,7 +85,7 @@ void loop()
     sparki.println(delayTime);
     sparki.print("maxDistance: "); // show max Distance on screen
     sparki.println(maxDistance);
-    sparki.print("x y h: "); // show positional information on screen
+    sparki.print("xyh: "); // show positional information on screen
     sparki.print(xCoord);
     sparki.print(" ");
     sparki.print(yCoord);
@@ -162,6 +162,10 @@ void loop()
             case pickDirection:
               nextMissionState = exploring;
               nextOpState = testDirection;
+              if (distanceToHome() > maxDistance) // If Sparki is beyond maxDistance, point home first
+                {
+                  pointHome();
+                }
               deltaCandidate = randomHeadingDelta();
               break;
             case testDirection:
