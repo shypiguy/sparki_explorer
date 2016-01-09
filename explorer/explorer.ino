@@ -1,3 +1,27 @@
+/******************************************************************************
+
+    Sparki Explorer Experiment
+    Copyright (C) 2016  William Curtis Jones
+
+    This program is free software; you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation; either version 2 of the License, or
+    (at your option) any later version.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+    email:      banda_cycle@sbcglobal.net
+    snail mail: 14 Ravenwood Circle, O'Fallon IL 62269
+
+********************************************************************************/
+
 /*******************************************
  Sparki explorer experiemnt
  
@@ -23,47 +47,78 @@ const int testDirection = 1;
 const int rotate = 2;
 const int travel = 3;
 
+// moveMode constants
+const int goForward = 0;
+const int rotateLeft = 1;
+const int rotateRight = 2;
+const int noMove = 3;
+
 // operation constants
-const int waitTime = 700;
 const int maxWalk = 40;
 
 // global variables
-float xCoord;
-float yCoord;
-int heading;
+float xCoord;           //measure in cm of robot distance from origin on X axis
+float yCoord;           //measure in cm of robot distance from origin on Y axis
+int heading;            //measure in degrees of robot heading relative to starting position
 
-int opState;
-int missionState;
-int nextMissionState;
-int nextOpState;
+int opState;            //indicator of the current operation state (mission step) - see opState constants above for possible values
+int missionState;       //indicator of the current mission state - see missionState constants above for possible values
+int nextMissionState;   //mission state to be applied at next pass through the decision switches
+int nextOpState;        //operation state (mission step) to be applied at the start of the next pass throught he decision switches
 
-int deltaCandidate;
-int clearanceCandidate;
+int deltaCandidate;     // offset in degrees from the current heading to be considered in the next pass through the descision switches
+int clearanceCandidate; // distance in cm measured a the last pass through the sensing steps
+
+int moveMode;           // indicator of the current movement command type - see moveMode constants above for possible values
+
+int maxDistance;        // maximum distance in cm from the point of origin that Sparki should be allowed to travel
+int stepsLeft;          // count of remaining steps in current move operation not yet sent as move command to the motors
+int stepsAtATime;       // maximum number of steps that can be commanded to the motors in a single pass through the move steps
+
+int delayTime;          // delay time in milliseconds to be applied at the end of each loop pass resulting in a motor command
 
 void setup() 
 {
+  //initialize the pseudo random number generator - the magnetometer gives a good random seed
   randomSeed(sparki.magY());
+  
+  // set starting operation parameters - can be changed by the user at run time
+  delayTime = 200;
+  maxDistance = 150;
+  stepsAtATime = 50;
+  
+  // set indicators that Sparki is at origin, waiting for a command
   missionState = atHome;
-  sparki.servo(0);       //center the range finder
-  delay(waitTime);  
+  moveMode = noMove;
+  xCoord = 0;
+  yCoord = 0;
+  heading = 0;
+
+  //center the range finder
+  sparki.servo(0);       
+  delay(delayTime);  
 }
 
 void loop() 
 {
 
-    sparki.clearLCD(); // wipe the screen
-    sparki.print("missionState: "); // show heading on screen
-    sparki.println(missionState);
-    sparki.print("opState: "); // show heading on screen
-    sparki.println(opState);
-    sparki.print("deltaCandidate: "); // show heading on screen
-    sparki.println(deltaCandidate);
-    sparki.print("clearanceCandidate: "); // show heading on screen
-    sparki.println(clearanceCandidate);
+  // ***Display operating info***
     
+    sparki.clearLCD(); // wipe the screen
+    sparki.print("delayTime: "); // show delayTime setting on screen
+    sparki.println(delayTime);
+    sparki.print("maxDistance: "); // show max Distance on screen
+    sparki.println(maxDistance);
+    sparki.print("xyh: "); // show positional information on screen
+    sparki.print(xCoord);
+    sparki.print(" ");
+    sparki.print(yCoord);
+    sparki.print(" ");
+    sparki.println(heading);
     sparki.updateLCD(); // display all of the information written to the screen    
   
-  // Scan for IR receiver
+  // ***Handle User input from IR remote***
+  
   int command = sparki.readIR();
 
      // if there is a valid remote button press
@@ -86,15 +141,32 @@ void loop()
       case 94:  // button "3" = stop and reset in place 
         nextMissionState = atHome;
         break;
+      case 70:  // button "up arrow" = increase delay
+        delayTime = delayTime + 10;
+        break;
+      case 21:  // button "down arrow" = decrease delay
+        if (delayTime >= 10){delayTime = delayTime - 10;}
+        break;
+      case 68:  // button "left arrow"  = decrease allowed range
+        if (maxDistance >= 40){maxDistance = maxDistance -10;}
+        break;
+      case 67:  // button "right arrow" = increase allowed range
+        maxDistance = maxDistance + 10;
+        break; 
     }
   }
 
+  // ***Gather clearnce reading from ultrasonic sensor***
+
+
+  
+  
   bool stillBusy = (sparki.areMotorsRunning());
 
   switch(stillBusy)
   {
     case true:
-      delay(waitTime);
+      delay(delayTime);
       break;
     case false:
       missionState = nextMissionState;
@@ -114,6 +186,10 @@ void loop()
             case pickDirection:
               nextMissionState = exploring;
               nextOpState = testDirection;
+              if (distanceToHome() > maxDistance) // If Sparki is beyond maxDistance, point home first
+                {
+                  pointHome();
+                }
               deltaCandidate = randomHeadingDelta();
               break;
             case testDirection:
@@ -227,49 +303,64 @@ float distanceAtDelta(int delta)
   int max_observation;
   int min_observation;
   int obSum[3];
-  int obCount;
+  int obCount[3];
   switch(deltaPossible)
   {
     case true:
-      sparki.servo(-1*delta);
-      delay(waitTime);
+      sparki.servo(-1*delta - 10);
+      //delay(delayTime);
       obSum[0] = 0;
+      obCount[0] = 1;
       for (i = 0; i < 5; i++)
       {
         observation[i] = sparki.ping();
       }
       for (i = 0; i < 5; i++)
       {
-        obSum[0] = obSum[0] + observation[i];
+        if (observation[i] != -1)
+        {
+          obSum[0] = obSum[0] + observation[i];
+          obCount[0]++;
+        }
       }
-      obSum[1] = 0;   
-      sparki.servo(-1*delta + 10);
-      delay(waitTime);
+      obSum[1] = 0;  
+      obCount[1] = 0; 
+      sparki.servo(-1*delta);
+      //delay(delayTime);
       for (i = 0; i < 5; i++)
       {
         observation[i] = sparki.ping();
       }
       for (i = 0; i < 5; i++)
       {
-        obSum[1] = obSum[1] + observation[i];
+        if (observation[i] != -1)
+        {
+          obSum[1] = obSum[1] + observation[i];
+          obCount[1]++;
+        }
       }
       obSum[2] = 0;
-      sparki.servo(-1*delta - 10);
-      delay(waitTime);
+      obCount[2] = 0;
+      sparki.servo(-1*delta + 10);
+      //delay(delayTime);
       for (i = 0; i < 5; i++)
       {
         observation[i] = sparki.ping();
       }
       for (i = 0; i < 5; i++)
       {
-        obSum[2] = obSum[2] + observation[i];
+        if (observation[i] != -1)
+        {
+          obSum[2] = obSum[2] + observation[i];
+          obCount[2]++;
+        }
       } 
-      min_observation = obSum[0];
+      min_observation = obSum[0]/obCount[0];
       for (i = 1; i < 3; i++)
       {
-        if (obSum[i] < min_observation){min_observation = obSum[i];}      
+        if (obSum[i]/obCount[i] < min_observation){min_observation = obSum[i]/obCount[i];}      
       }
-      return min_observation/5;
+      return min_observation;
       break;
     case false:
       break; 
