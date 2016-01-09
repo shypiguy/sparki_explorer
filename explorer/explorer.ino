@@ -75,6 +75,8 @@ void setup()
 void loop() 
 {
 
+  // ***Display operating info***
+    
     sparki.clearLCD(); // wipe the screen
     sparki.print("delayTime: "); // show delayTime setting on screen
     sparki.println(delayTime);
@@ -88,7 +90,8 @@ void loop()
     sparki.println(heading);
     sparki.updateLCD(); // display all of the information written to the screen    
   
-  // Scan for IR receiver
+  // ***Handle User input from IR remote***
+  
   int command = sparki.readIR();
 
      // if there is a valid remote button press
@@ -126,6 +129,11 @@ void loop()
     }
   }
 
+  // ***Gather clearnce reading from ultrasonic sensor***
+
+
+  
+  
   bool stillBusy = (sparki.areMotorsRunning());
 
   switch(stillBusy)
@@ -264,49 +272,64 @@ float distanceAtDelta(int delta)
   int max_observation;
   int min_observation;
   int obSum[3];
-  int obCount;
+  int obCount[3];
   switch(deltaPossible)
   {
     case true:
-      sparki.servo(-1*delta);
-      delay(delayTime);
+      sparki.servo(-1*delta - 10);
+      //delay(delayTime);
       obSum[0] = 0;
+      obCount[0] = 1;
       for (i = 0; i < 5; i++)
       {
         observation[i] = sparki.ping();
       }
       for (i = 0; i < 5; i++)
       {
-        obSum[0] = obSum[0] + observation[i];
+        if (observation[i] != -1)
+        {
+          obSum[0] = obSum[0] + observation[i];
+          obCount[0]++;
+        }
       }
-      obSum[1] = 0;   
-      sparki.servo(-1*delta + 10);
-      delay(delayTime);
+      obSum[1] = 0;  
+      obCount[1] = 0; 
+      sparki.servo(-1*delta);
+      //delay(delayTime);
       for (i = 0; i < 5; i++)
       {
         observation[i] = sparki.ping();
       }
       for (i = 0; i < 5; i++)
       {
-        obSum[1] = obSum[1] + observation[i];
+        if (observation[i] != -1)
+        {
+          obSum[1] = obSum[1] + observation[i];
+          obCount[1]++;
+        }
       }
       obSum[2] = 0;
-      sparki.servo(-1*delta - 10);
-      delay(delayTime);
+      obCount[2] = 0;
+      sparki.servo(-1*delta + 10);
+      //delay(delayTime);
       for (i = 0; i < 5; i++)
       {
         observation[i] = sparki.ping();
       }
       for (i = 0; i < 5; i++)
       {
-        obSum[2] = obSum[2] + observation[i];
+        if (observation[i] != -1)
+        {
+          obSum[2] = obSum[2] + observation[i];
+          obCount[2]++;
+        }
       } 
-      min_observation = obSum[0];
+      min_observation = obSum[0]/obCount[0];
       for (i = 1; i < 3; i++)
       {
-        if (obSum[i] < min_observation){min_observation = obSum[i];}      
+        if (obSum[i]/obCount[i] < min_observation){min_observation = obSum[i]/obCount[i];}      
       }
-      return min_observation/5;
+      return min_observation;
       break;
     case false:
       break; 
