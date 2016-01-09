@@ -66,6 +66,9 @@ void setup()
   // set indicators that Sparki is at origin, waiting for a command
   missionState = atHome;
   moveMode = noMove;
+  xCoord = 0;
+  yCoord = 0;
+  heading = 0;
 
   //center the range finder
   sparki.servo(0);       
