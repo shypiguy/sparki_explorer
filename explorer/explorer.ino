@@ -165,7 +165,22 @@ void loop()
   }
 
   // ***Gather clearnce reading from ultrasonic sensor***
+  // only do if moving
 
+  switch(moveMode)
+  {
+    case goForward:
+      clearanceCandidate = distanceAtDelta(0);
+      break;
+    case rotateLeft:
+      clearanceCandidate = distanceAtDelta(80);
+      break;
+    case rotateRight:
+      clearanceCandidate = distanceAtDelta(-80);
+      break;
+    case noMove:
+      break;
+  }
   
   
   
