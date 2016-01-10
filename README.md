@@ -35,6 +35,11 @@ LEFT = decrease maximum range Sparki is allowed to explore (min = 40 cm)
 
 RIGHT = increase maximum range Sparki is allowed to explore
 
+MINUS = decrease the number of steps Sparki takes per loop when moving or rotating
+
+PLUS = increase the number of steps Sparki takes per loop when moving or rotating
+
+
 
 
 LED Status:
