@@ -59,7 +59,7 @@ const int maxWalk = 40;
 // global variables
 float xCoord;           //measure in cm of robot distance from origin on X axis
 float yCoord;           //measure in cm of robot distance from origin on Y axis
-int heading;            //measure in degrees of robot heading relative to starting position
+float heading;          //measure in degrees of robot heading relative to starting position
 
 int opState;            //indicator of the current operation state (mission step) - see opState constants above for possible values
 int missionState;       //indicator of the current mission state - see missionState constants above for possible values
@@ -70,12 +70,13 @@ int deltaCandidate;     // offset in degrees from the current heading to be cons
 int clearanceCandidate; // distance in cm measured a the last pass through the sensing steps
 
 int moveMode;           // indicator of the current movement command type - see moveMode constants above for possible values
+int nextMoveMode;        // movement command type to be applied at the start of the next pass through the move switches
 
 int maxDistance;        // maximum distance in cm from the point of origin that Sparki should be allowed to travel
 int stepsLeft;          // count of remaining steps in current move operation not yet sent as move command to the motors
 int stepsAtATime;       // maximum number of steps that can be commanded to the motors in a single pass through the move steps
 
-int delayTime;          // delay time in milliseconds to be applied at the end of each loop pass resulting in a motor command
+bool doAScan;           // true/false indicator - should Sparki do a moving scan?
 
 void setup() 
 {
@@ -83,20 +84,19 @@ void setup()
   randomSeed(sparki.magY());
   
   // set starting operation parameters - can be changed by the user at run time
-  delayTime = 200;
-  maxDistance = 150;
-  stepsAtATime = 20;
+  maxDistance = 60;
+  stepsAtATime = 900;
   
   // set indicators that Sparki is at origin, waiting for a command
-  missionState = atHome;
-  moveMode = noMove;
+  nextMissionState = atHome;
+  nextMoveMode = noMove;
   xCoord = 0;
   yCoord = 0;
   heading = 0;
+  doAScan = false;
 
   //center the range finder
   sparki.servo(0);       
-  delay(delayTime);  
 }
 
 void loop() 
@@ -105,17 +105,15 @@ void loop()
   // ***Display operating info***
     
     sparki.clearLCD(); // wipe the screen
-    sparki.print("delayTime: "); // show delayTime setting on screen
-    sparki.println(delayTime);
     sparki.print("maxDistance: "); // show max Distance on screen
     sparki.println(maxDistance);
     sparki.print("stepsAtATime: "); // show max Distance on screen
     sparki.println(stepsAtATime);
-    sparki.print("xyh: "); // show positional information on screen
+    sparki.print("x and y: "); // show positional information on screen
     sparki.print(xCoord);
     sparki.print(" ");
-    sparki.print(yCoord);
-    sparki.print(" ");
+    sparki.println(yCoord);
+    sparki.print("heading: ");
     sparki.println(heading);
     sparki.updateLCD(); // display all of the information written to the screen    
   
@@ -129,8 +127,11 @@ void loop()
     switch(command)
     {
       case 12: // button "1" = explore
-        nextMissionState = exploring;
-        nextOpState = pickDirection;
+        if(nextMissionState != exploring)
+        {
+          nextMissionState = exploring;
+          nextOpState = pickDirection;
+        }
         break;
       case 24: // button "2" = go home
         if (missionState == returnTest || missionState == returnClear || missionState == returnObstructed)
@@ -139,15 +140,11 @@ void loop()
         }
         nextMissionState = returnTest;
         nextOpState = pickDirection;
+        nextMoveMode = noMove;
         break;
       case 94:  // button "3" = stop and reset in place 
         nextMissionState = atHome;
-        break;
-      case 70:  // button "up arrow" = increase delay
-        delayTime = delayTime + 10;
-        break;
-      case 21:  // button "down arrow" = decrease delay
-        if (delayTime >= 10){delayTime = delayTime - 10;}
+        nextMoveMode = noMove;
         break;
       case 68:  // button "left arrow"  = decrease allowed range
         if (maxDistance >= 40){maxDistance = maxDistance -10;}
@@ -156,31 +153,17 @@ void loop()
         maxDistance = maxDistance + 10;
         break; 
       case 22:  // button "minus" = decrease stepsAtATime
-        if (stepsAtATime >= 2){stepsAtATime--;}
+        if (stepsAtATime >= 200){stepsAtATime = stepsAtATime - 50;}
         break;
       case 13:  // button "plus" = increase stepsAtATime
-        stepsAtATime++;
+        stepsAtATime = stepsAtATime + 50;
         break;
     }
   }
 
-  // ***Gather clearnce reading from ultrasonic sensor***
-  // only do if moving
+  moveMode = nextMoveMode;
+  
 
-  switch(moveMode)
-  {
-    case goForward:
-      clearanceCandidate = distanceAtDelta(0);
-      break;
-    case rotateLeft:
-      clearanceCandidate = distanceAtDelta(80);
-      break;
-    case rotateRight:
-      clearanceCandidate = distanceAtDelta(-80);
-      break;
-    case noMove:
-      break;
-  }
   
   
   
@@ -189,9 +172,95 @@ void loop()
   switch(stillBusy)
   {
     case true:
-      delay(delayTime);
+        // ***Gather clearnce reading from ultrasonic sensor***
+        // only do if in the process of moving
+      if (doAScan)
+      {
+        switch(moveMode)
+        {
+          case goForward:
+            clearanceCandidate = distanceAtDelta(0);
+            break;
+          case rotateLeft:
+            clearanceCandidate = distanceAtDelta(80);
+            break;
+          case rotateRight:
+            clearanceCandidate = distanceAtDelta(-80);
+           break;
+          case noMove:
+          break;
+        }
+        doAScan = false;
+      }
       break;
     case false:
+
+      
+      // *** Do _either_ next move requested, or make next decision***
+
+      switch(moveMode)
+      {
+        case goForward:
+          if(clearanceCandidate > (stepsAtATime/STEPS_PER_CM))
+          {
+            int moveSteps = min(stepsLeft, stepsAtATime);
+            stepsLeft = stepsLeft - moveSteps;
+            if(stepsLeft == 0){nextMoveMode = noMove;}
+            sparki.stepForward(moveSteps);
+            xCoord = xCoord + (moveSteps/STEPS_PER_CM)*cos(heading*PI/180);
+            yCoord = yCoord + (moveSteps/STEPS_PER_CM)*sin(heading*PI/180);
+            doAScan = true;
+          }
+          else
+          {
+            stepsLeft = 0;
+            nextMoveMode = noMove;
+          }
+          break;
+        case rotateLeft:
+          if(clearanceCandidate > 3)
+          {
+            int turnSteps = min(stepsLeft, stepsAtATime);
+            stepsLeft = stepsLeft - turnSteps;
+            if(stepsLeft == 0){nextMoveMode = noMove;}
+            sparki.stepLeft(turnSteps);
+            heading = fmod(heading + (turnSteps/STEPS_PER_DEGREE), 360);
+            doAScan = true;
+          }
+          else
+          {
+            stepsLeft = 0;
+            nextMoveMode = noMove;
+          }
+          break;
+        case rotateRight:
+          if(clearanceCandidate > 3)
+          {
+            int turnSteps = min(stepsLeft, stepsAtATime);
+            stepsLeft = stepsLeft - turnSteps;
+            if(stepsLeft == 0){nextMoveMode = noMove;}
+            sparki.stepRight(turnSteps);
+            heading = fmod(heading - (turnSteps/STEPS_PER_DEGREE), 360);
+            doAScan = true;
+          }
+          else
+          {
+            stepsLeft = 0;
+            nextMoveMode = noMove;
+          }
+          break;
+        case noMove:
+          decide();
+          break;
+      }
+      break;
+   }
+}  
+      
+      
+      
+void decide()
+{      
       missionState = nextMissionState;
       opState = nextOpState;
       switch(missionState)
@@ -201,6 +270,7 @@ void loop()
           xCoord = 0;
           yCoord = 0;
           heading = 0;
+          nextMoveMode = noMove;
           break;
         case exploring:
           sparki.RGB(RGB_BLUE);
@@ -269,9 +339,8 @@ void loop()
           {nextMissionState = atHome;}
           else
           {nextMissionState = returnTest; nextOpState = testDirection;}
-          xCoord = xCoord + clearanceCandidate*cos(heading*PI/180);
-          yCoord = yCoord + clearanceCandidate*sin(heading*PI/180);
-          sparki.moveForward(clearanceCandidate);
+          nextMoveMode = goForward;
+          stepsLeft = clearanceCandidate * STEPS_PER_CM;
           break;
         case returnObstructed:
           sparki.RGB(RGB_RED);
@@ -307,8 +376,6 @@ void loop()
           }
           break;
       }
-      break;
-  }
 }
 
 int randomHeadingDelta()
@@ -320,25 +387,23 @@ float distanceAtDelta(int delta)
 {
   bool deltaPossible = (delta >= -70 && delta <= 70);
   float range = -1;
-  int observation[5];
+  int observation[3];
   int i;
-  int j;
-  int max_observation;
+  //int max_observation;
   int min_observation;
   int obSum[3];
   int obCount[3];
   switch(deltaPossible)
   {
     case true:
-      sparki.servo(-1*delta - 10);
-      //delay(delayTime);
+      sparki.servo(-1*delta - 15);
       obSum[0] = 0;
       obCount[0] = 1;
-      for (i = 0; i < 5; i++)
+      for (i = 0; i < 3; i++)
       {
         observation[i] = sparki.ping();
       }
-      for (i = 0; i < 5; i++)
+      for (i = 0; i < 3; i++)
       {
         if (observation[i] != -1)
         {
@@ -349,12 +414,11 @@ float distanceAtDelta(int delta)
       obSum[1] = 0;  
       obCount[1] = 0; 
       sparki.servo(-1*delta);
-      //delay(delayTime);
-      for (i = 0; i < 5; i++)
+      for (i = 0; i < 3; i++)
       {
         observation[i] = sparki.ping();
       }
-      for (i = 0; i < 5; i++)
+      for (i = 0; i < 3; i++)
       {
         if (observation[i] != -1)
         {
@@ -364,13 +428,12 @@ float distanceAtDelta(int delta)
       }
       obSum[2] = 0;
       obCount[2] = 0;
-      sparki.servo(-1*delta + 10);
-      //delay(delayTime);
-      for (i = 0; i < 5; i++)
+      sparki.servo(-1*delta + 15);
+      for (i = 0; i < 3; i++)
       {
         observation[i] = sparki.ping();
       }
-      for (i = 0; i < 5; i++)
+      for (i = 0; i < 3; i++)
       {
         if (observation[i] != -1)
         {
@@ -393,27 +456,25 @@ float distanceAtDelta(int delta)
 
 void turnToDelta(int headingDelta)
 {
-  heading = (heading + headingDelta) % 360;
   bool turnRight = headingDelta < 0;
   switch (turnRight)
       {
         case true:
-            sparki.moveRight(-1*headingDelta);
+            nextMoveMode = rotateRight;
+            stepsLeft = int(-1*headingDelta*STEPS_PER_DEGREE);
             break;
         case false:
-            sparki.moveLeft(headingDelta);
+            nextMoveMode = rotateLeft;
+            stepsLeft = int(headingDelta*STEPS_PER_DEGREE);
             break;
       }
 }
 
 void goForth(int clearance)
 {
-  int distance = random(min(clearance -10, maxWalk));
-  xCoord = xCoord + distance*cos(heading*PI/180);
-  yCoord = yCoord + distance*sin(heading*PI/180);
-  //sparki.moveForward(distance);
-  unsigned long steps = distance * STEPS_PER_CM;
-  sparki.stepForward(steps);
+  int distance = min(clearance -10, maxWalk);
+  stepsLeft = distance * STEPS_PER_CM;
+  nextMoveMode = goForward;
 }
 
 void pointHome()
