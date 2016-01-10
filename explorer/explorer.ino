@@ -85,7 +85,7 @@ void setup()
   // set starting operation parameters - can be changed by the user at run time
   delayTime = 200;
   maxDistance = 150;
-  stepsAtATime = 50;
+  stepsAtATime = 20;
   
   // set indicators that Sparki is at origin, waiting for a command
   missionState = atHome;
@@ -109,6 +109,8 @@ void loop()
     sparki.println(delayTime);
     sparki.print("maxDistance: "); // show max Distance on screen
     sparki.println(maxDistance);
+    sparki.print("stepsAtATime: "); // show max Distance on screen
+    sparki.println(stepsAtATime);
     sparki.print("xyh: "); // show positional information on screen
     sparki.print(xCoord);
     sparki.print(" ");
@@ -153,12 +155,18 @@ void loop()
       case 67:  // button "right arrow" = increase allowed range
         maxDistance = maxDistance + 10;
         break; 
+      case 22:  // button "minus" = decrease stepsAtATime
+        if (stepsAtATime >= 2){stepsAtATime--;}
+        break;
+      case 13:  // button "plus" = increase stepsAtATime
+        stepsAtATime++;
+        break;
     }
   }
 
   // ***Gather clearnce reading from ultrasonic sensor***
 
-
+  
   
   
   bool stillBusy = (sparki.areMotorsRunning());
