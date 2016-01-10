@@ -73,7 +73,7 @@ int moveMode;           // indicator of the current movement command type - see 
 int nextMoveMode;        // movement command type to be applied at the start of the next pass through the move switches
 
 int maxDistance;        // maximum distance in cm from the point of origin that Sparki should be allowed to travel
-int stepsLeft;          // count of remaining steps in current move operation not yet sent as move command to the motors
+unsigned long stepsLeft;// count of remaining steps in current move operation not yet sent as move command to the motors
 int stepsAtATime;       // maximum number of steps that can be commanded to the motors in a single pass through the move steps
 
 bool doAScan;           // true/false indicator - should Sparki do a moving scan?
@@ -84,8 +84,8 @@ void setup()
   randomSeed(sparki.magY());
   
   // set starting operation parameters - can be changed by the user at run time
-  maxDistance = 60;
-  stepsAtATime = 900;
+  maxDistance = 70;
+  stepsAtATime = 1000;
   
   // set indicators that Sparki is at origin, waiting for a command
   nextMissionState = atHome;
@@ -115,6 +115,8 @@ void loop()
     sparki.println(yCoord);
     sparki.print("heading: ");
     sparki.println(heading);
+    sparki.print("stepsLeft: ");
+    sparki.println(stepsLeft);
     sparki.updateLCD(); // display all of the information written to the screen    
   
   // ***Handle User input from IR remote***
@@ -182,10 +184,10 @@ void loop()
             clearanceCandidate = distanceAtDelta(0);
             break;
           case rotateLeft:
-            clearanceCandidate = distanceAtDelta(80);
+            clearanceCandidate = distanceAtDelta(75);
             break;
           case rotateRight:
-            clearanceCandidate = distanceAtDelta(-80);
+            clearanceCandidate = distanceAtDelta(-75);
            break;
           case noMove:
           break;
@@ -200,6 +202,7 @@ void loop()
 
       switch(moveMode)
       {
+        int turnSteps;
         case goForward:
           if(clearanceCandidate > (stepsAtATime/STEPS_PER_CM))
           {
@@ -218,36 +221,20 @@ void loop()
           }
           break;
         case rotateLeft:
-          if(clearanceCandidate > 3)
-          {
-            int turnSteps = min(stepsLeft, stepsAtATime);
+            turnSteps = min(stepsLeft, stepsAtATime);
             stepsLeft = stepsLeft - turnSteps;
             if(stepsLeft == 0){nextMoveMode = noMove;}
             sparki.stepLeft(turnSteps);
             heading = fmod(heading + (turnSteps/STEPS_PER_DEGREE), 360);
             doAScan = true;
-          }
-          else
-          {
-            stepsLeft = 0;
-            nextMoveMode = noMove;
-          }
           break;
         case rotateRight:
-          if(clearanceCandidate > 3)
-          {
-            int turnSteps = min(stepsLeft, stepsAtATime);
+            turnSteps = min(stepsLeft, stepsAtATime);
             stepsLeft = stepsLeft - turnSteps;
             if(stepsLeft == 0){nextMoveMode = noMove;}
             sparki.stepRight(turnSteps);
             heading = fmod(heading - (turnSteps/STEPS_PER_DEGREE), 360);
             doAScan = true;
-          }
-          else
-          {
-            stepsLeft = 0;
-            nextMoveMode = noMove;
-          }
           break;
         case noMove:
           decide();
@@ -279,7 +266,7 @@ void decide()
             case pickDirection:
               nextMissionState = exploring;
               nextOpState = testDirection;
-              if (distanceToHome() > maxDistance) // If Sparki is beyond maxDistance, point home first
+              if (distanceToHome() > maxDistance -10) // If Sparki is beyond maxDistance, point home first
                 {
                   pointHome();
                 }
@@ -446,6 +433,13 @@ float distanceAtDelta(int delta)
       {
         if (obSum[i]/obCount[i] < min_observation){min_observation = obSum[i]/obCount[i];}      
       }
+      
+      while (sqrt(pow(xCoord + min_observation*cos((heading+delta)*PI/180),2)+pow(yCoord + min_observation*sin((heading+delta)*PI/180),2)) > maxDistance)
+      {
+        min_observation = min_observation -1;
+      }
+      
+      
       return min_observation;
       break;
     case false:
@@ -483,8 +477,8 @@ void pointHome()
   if (xCoord < 0) {headingOut = headingOut + 180;}
   float headingBack = fmod(headingOut + 180, 360);
   float deltaHeading = headingBack - heading;
-  heading = headingBack;
-  sparki.moveLeft(deltaHeading);
+  stepsLeft = (unsigned long) deltaHeading*STEPS_PER_DEGREE;
+  nextMoveMode = rotateLeft;
 }
 
 float distanceToHome()
