@@ -70,7 +70,7 @@ int deltaCandidate;     // offset in degrees from the current heading to be cons
 int clearanceCandidate; // distance in cm measured a the last pass through the sensing steps
 
 int moveMode;           // indicator of the current movement command type - see moveMode constants above for possible values
-int nextMoveMode;        // movement command type to be applied at the start of the next pass through the move switches
+int nextMoveMode;       // movement command type to be applied at the start of the next pass through the move switches
 
 int maxDistance;        // maximum distance in cm from the point of origin that Sparki should be allowed to travel
 unsigned long stepsLeft;// count of remaining steps in current move operation not yet sent as move command to the motors
@@ -105,6 +105,7 @@ void loop()
   // ***Display operating info***
     
     sparki.clearLCD(); // wipe the screen
+    sparki.println("DEBUG2");
     sparki.print("maxDistance: "); // show max Distance on screen
     sparki.println(maxDistance);
     sparki.print("stepsAtATime: "); // show max Distance on screen
@@ -204,7 +205,7 @@ void loop()
       {
         int turnSteps;
         case goForward:
-          if(clearanceCandidate > (stepsAtATime/STEPS_PER_CM))
+          if(clearanceCandidate > 3*(stepsAtATime/STEPS_PER_CM))
           {
             int moveSteps = min(stepsLeft, stepsAtATime);
             stepsLeft = stepsLeft - moveSteps;
@@ -221,6 +222,7 @@ void loop()
           }
           break;
         case rotateLeft:
+            if (stepsLeft <= 0 ){sparki.beep();}
             turnSteps = min(stepsLeft, stepsAtATime);
             stepsLeft = stepsLeft - turnSteps;
             if(stepsLeft == 0){nextMoveMode = noMove;}
@@ -266,11 +268,11 @@ void decide()
             case pickDirection:
               nextMissionState = exploring;
               nextOpState = testDirection;
+              deltaCandidate = randomHeadingDelta();
               if (distanceToHome() > maxDistance -10) // If Sparki is beyond maxDistance, point home first
                 {
                   pointHome();
                 }
-              deltaCandidate = randomHeadingDelta();
               break;
             case testDirection:
               nextMissionState = exploring;
@@ -307,7 +309,7 @@ void decide()
               break;
             case testDirection:
               clearanceCandidate = distanceAtDelta(0);
-              if (clearanceCandidate > min(distanceToHome(), maxWalk))
+              if (clearanceCandidate > distanceToHome())
               {
                 nextMissionState = returnClear;
               }
@@ -321,8 +323,8 @@ void decide()
           break;
         case returnClear:
           sparki.RGB(RGB_RED);
-          clearanceCandidate = min(distanceToHome(), maxWalk);
-          if (clearanceCandidate < maxWalk)
+          clearanceCandidate = distanceToHome();
+          if (clearanceCandidate < 1.5)
           {nextMissionState = atHome;}
           else
           {nextMissionState = returnTest; nextOpState = testDirection;}
@@ -477,8 +479,20 @@ void pointHome()
   if (xCoord < 0) {headingOut = headingOut + 180;}
   float headingBack = fmod(headingOut + 180, 360);
   float deltaHeading = headingBack - heading;
-  stepsLeft = (unsigned long) deltaHeading*STEPS_PER_DEGREE;
-  nextMoveMode = rotateLeft;
+  if (deltaHeading < 0 ) {deltaHeading = deltaHeading + 360;}
+  if (deltaHeading <= 180)
+  {
+    stepsLeft = (unsigned long) deltaHeading*STEPS_PER_DEGREE;
+    nextMoveMode = rotateLeft; 
+  }
+  else
+  {
+    deltaHeading = 360 - deltaHeading;
+    stepsLeft = (unsigned long) deltaHeading*STEPS_PER_DEGREE;
+    nextMoveMode = rotateRight;     
+  }
+
+  //sparki.beep();
 }
 
 float distanceToHome()
